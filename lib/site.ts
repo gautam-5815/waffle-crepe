@@ -1,2 +1,6 @@
-// Public URL of the deployed site. Set NEXT_PUBLIC_SITE_URL on Vercel (e.g. a preview domain before go-live).
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://wafflencrepe.com").replace(/\/$/, "");
+// Public URL of the deployed site. NEXT_PUBLIC_SITE_URL wins; otherwise Vercel's production domain
+// (set automatically on Vercel), then the brand domain.
+const vercelHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+export const SITE_URL = (
+  process.env.NEXT_PUBLIC_SITE_URL || (vercelHost ? `https://${vercelHost}` : "https://wafflencrepe.com")
+).replace(/\/$/, "");
