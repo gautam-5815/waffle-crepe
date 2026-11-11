@@ -1,0 +1,3 @@
+# Source frame export for the hero walkthrough. public/frames is built from it
+# (resampled and re-encoded), so the 43 MB originals must not be deployed.
+public/Frame
