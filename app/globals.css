@@ -142,12 +142,34 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
   mask-image: radial-gradient(70% 70% at 70% 45%, #000 20%, transparent 75%);
   pointer-events: none;
 }
-.hero__canvas {
-  position: absolute; right: -2vw; top: 54%;
-  width: min(60vw, 105svh, 980px); height: min(60vw, 105svh, 980px);
+/* Hero photography: a large plated shot with a smaller drink offset in front. */
+.hero__art {
+  position: absolute; right: -1vw; top: 50%;
+  width: min(56vw, 100svh, 900px); height: min(56vw, 100svh, 900px);
   transform: translateY(-50%);
   z-index: 1;
+  pointer-events: none;
 }
+.hero__plate {
+  position: absolute; inset: 0;
+  margin: 0;
+  border-radius: 999px 999px 32px 32px;
+  overflow: hidden;
+  box-shadow: 0 50px 90px -40px rgba(42, 22, 11, .45), 0 0 0 1px rgba(42, 22, 11, .05);
+  visibility: hidden;
+}
+.hero__plate img { object-fit: cover; }
+.hero__pour {
+  position: absolute; left: -6%; bottom: 2%;
+  width: 34%; aspect-ratio: 3 / 4;
+  margin: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 32px 60px -28px rgba(42, 22, 11, .5);
+  border: 6px solid var(--cream);
+  visibility: hidden;
+}
+.hero__pour img { object-fit: cover; }
 .hero__copy { position: relative; z-index: 2; max-width: 46rem; }
 .hero__title {
   font-size: var(--step-hero);
@@ -176,11 +198,56 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
 
 @media (max-width: 860px) {
   .hero { grid-template-columns: 1fr; align-items: end; padding-top: 6rem; }
-  .hero__canvas { width: 110vw; height: 110vw; right: -5vw; top: 4.5rem; transform: none; }
-  .hero__copy { margin-top: 84vw; }
+  .hero__art { width: 86vw; height: 86vw; right: 2vw; top: 4.5rem; transform: none; }
+  .hero__plate { border-radius: 999px 999px 24px 24px; }
+  /* The plate carries the hero on a phone; the drink inset would only crowd it. */
+  .hero__pour { display: none; }
+  .hero__copy { margin-top: 82vw; }
   .hero__badge { width: 112px; height: 112px; top: 6.5rem; bottom: auto; right: var(--gutter); }
   .hero__badge strong { font-size: 1rem; }
   .hero__hint { display: none; }
+}
+
+/* Story: editorial collage of real shop photography on a dark band. */
+.story {
+  position: relative;
+  background: var(--ink);
+  color: var(--cream);
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: clamp(2rem, 5vw, 6rem);
+  align-items: center;
+  padding: clamp(6rem, 12vw, 11rem) var(--gutter);
+  overflow: hidden;
+}
+.story__copy { max-width: 34rem; }
+.story .eyebrow { color: var(--gold); }
+.story__title {
+  font-size: var(--step-2);
+  line-height: .95;
+  letter-spacing: -.035em;
+  font-weight: 800;
+  margin: 0 0 1.4rem;
+}
+.story__title em { color: var(--gold); }
+.story__lead { font-size: var(--step-1); color: rgba(255, 246, 230, .72); margin: 0 0 1.2rem; }
+.story__copy .btn { margin-top: 1.2rem; }
+.btn--light { border-color: rgba(255, 246, 230, .4); color: var(--cream); background: transparent; }
+.btn--light:hover { background: var(--cream); color: var(--ink); border-color: var(--cream); }
+
+.story__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: auto auto;
+  gap: clamp(.8rem, 1.6vw, 1.4rem);
+}
+.story__fig { margin: 0; overflow: hidden; border-radius: 22px; visibility: hidden; }
+.story__fig img { width: 100%; height: 100%; object-fit: cover; will-change: transform; }
+.story__fig--a { grid-column: 1 / -1; aspect-ratio: 16 / 10; }
+.story__fig--b, .story__fig--c { aspect-ratio: 4 / 3; }
+
+@media (max-width: 900px) {
+  .story { grid-template-columns: 1fr; }
 }
 
 /* Marquee */
@@ -210,7 +277,9 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
     var(--cream-2);
   overflow: hidden;
 }
-.plate__stage canvas { width: 100%; height: 100%; display: block; }
+.plate__shots { position: absolute; inset: 0; }
+.plate__shot { position: absolute; inset: 0; margin: 0; will-change: opacity, transform; }
+.plate__shot img { object-fit: cover; }
 .plate__price {
   position: absolute; left: 1.4rem; bottom: 1.4rem;
   background: var(--cream); border-radius: 999px; padding: .7rem 1.2rem;
@@ -409,7 +478,7 @@ html:not(.has-motion) .loader { display: none; }
 .flyer { position: fixed; z-index: 80; width: 64px; height: 64px; border-radius: 50%; object-fit: cover; pointer-events: none; box-shadow: 0 10px 30px rgba(42, 22, 11, .3); }
 
 .picker button:focus-visible { outline-offset: 2px; }
-.plate__stage::after { content: "Live 3D preview"; position: absolute; right: 1.4rem; top: 1.4rem; font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.plate__stage::after { content: "From the shop"; position: absolute; right: 1.4rem; top: 1.4rem; font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 .box__price strong, .dish p { font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { .marquee__track, .loader__grid i, .hero__scroll span::after { animation: none; } }
 .mmenu[hidden] { display: none; }

@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import VisitKitchens from "@/components/visit/VisitKitchens";
 import CateringForm from "@/components/visit/CateringForm";
 import PageMotion from "@/components/motion/PageMotion";
 import "./visit.css";
+
+const UP = "https://wafflencrepe.com/wp-content/uploads/";
 
 export const metadata: Metadata = {
   title: "Visit — Silicon Oasis & The Sustainable City",
@@ -56,6 +59,18 @@ export default function VisitPage() {
           <strong>4.9<span>★</span></strong>
           <p>rating on Talabat</p>
         </div>
+      </section>
+
+      <section className="catershots" aria-label="Sharing boxes we bring to events">
+        <figure className="catershot" data-image-reveal>
+          <Image src={`${UP}2023/04/FamilyBox.webp`} alt="An assorted family box of waffles, crepes and fruit" width={1000} height={1000} sizes="(max-width: 900px) 92vw, 33vw" data-parallax-img />
+        </figure>
+        <figure className="catershot" data-image-reveal>
+          <Image src={`${UP}2023/04/browniBox.webp`} alt="A box of brownies cut and arranged in rows" width={1000} height={1000} sizes="(max-width: 900px) 92vw, 33vw" data-parallax-img />
+        </figure>
+        <figure className="catershot" data-image-reveal>
+          <Image src={`${UP}2023/04/asstsushi.webp`} alt="An assorted box of rolled sushi crepes" width={1000} height={1000} sizes="(max-width: 900px) 92vw, 33vw" data-parallax-img />
+        </figure>
       </section>
 
       <section className="cater" id="catering">

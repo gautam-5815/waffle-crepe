@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { getMenu, findItem, money, slugify, type MenuItem } from "@/lib/menu";
-import HomeHero from "@/components/home/HomeHero";
+import HomeHero, { type HeroShot } from "@/components/home/HomeHero";
 import PlatePicker, { type PlateOption } from "@/components/home/PlatePicker";
 import HomeMotion from "@/components/home/HomeMotion";
 import PageMotion from "@/components/motion/PageMotion";
@@ -9,15 +9,19 @@ import { AddToCartButton } from "@/components/chrome/Cart";
 
 const UP = "https://wafflencrepe.com/wp-content/uploads/";
 
-// Picker dishes map to 3D topping presets; prices and photos come from the live shop.
-const PLATES: { preset: string; name: string; fallback: number; img: string }[] = [
-  { preset: "lotus", name: "Lotus Waffle", fallback: 37, img: `${UP}2023/04/lotus-315x473.webp` },
-  { preset: "nutty", name: "Nutty Waffle", fallback: 42, img: `${UP}2023/04/nutt-315x473.webp` },
-  { preset: "brownie", name: "Brownie Waffle", fallback: 47, img: `${UP}2023/04/brow-315x473.webp` },
-  { preset: "kinder", name: "Kinder Pancake", fallback: 42, img: `${UP}2026/08/Kinder-Pancake-315x473.png` },
-  { preset: "pistachio", name: "Pistachio Pancake", fallback: 50, img: `${UP}2023/04/pistachio_pan-315x473.webp` },
-  { preset: "canadian", name: "Canadian Pancake", fallback: 38, img: `${UP}2023/04/canadian-1-315x473.webp` },
+// Picker dishes; prices and photos come from the live shop, with pinned fallbacks.
+const PLATES: { name: string; fallback: number; img: string }[] = [
+  { name: "Lotus Waffle", fallback: 37, img: `${UP}2023/04/lotus-315x473.webp` },
+  { name: "Nutty Waffle", fallback: 42, img: `${UP}2023/04/nutt-315x473.webp` },
+  { name: "Brownie Waffle", fallback: 47, img: `${UP}2023/04/brow-315x473.webp` },
+  { name: "Kinder Pancake", fallback: 42, img: `${UP}2026/08/Kinder-Pancake-315x473.png` },
+  { name: "Pistachio Pancake", fallback: 50, img: `${UP}2023/04/pistachio_pan-315x473.webp` },
+  { name: "Canadian Pancake", fallback: 38, img: `${UP}2023/04/canadian-1-315x473.webp` },
 ];
+
+// Hero photography: real shop photos, taken live so they track the shop, with pinned fallbacks.
+const HERO_PLATE = { name: "Four Season Waffle", src: `${UP}2023/04/fourseason-1.webp`, alt: "A Four Season waffle topped with strawberries, kiwi, banana and chocolate sauce" };
+const HERO_POUR = { name: "Pistachio Milkshake", src: `${UP}2023/04/pistachio_milkshake.webp`, alt: "A tall pistachio milkshake topped with cream" };
 
 const BREAKFAST = ["Halloumi Waffle", "Egg Waffle", "Tuna Sandwich", "Mixed Cheese Sandwich"];
 const DRINKS = [
@@ -36,14 +40,15 @@ export default async function Home() {
   const menu = await getMenu();
   const plates: PlateOption[] = PLATES.map((p) => {
     const live = findItem(menu, p.name);
-    return { preset: p.preset, name: p.name, price: live?.price ?? p.fallback, img: live?.img || p.img };
+    return { name: p.name, price: live?.price ?? p.fallback, img: live?.img || p.img };
   });
+  const shot = (h: typeof HERO_PLATE): HeroShot => ({ src: findItem(menu, h.name)?.img || h.src, alt: h.alt });
   const boxes = menu.filter((m) => m.cats.includes("Sharing Box")).sort((a, b) => Number(b.was > b.price) - Number(a.was > a.price));
   const breakfast = BREAKFAST.map((n) => findItem(menu, n)).filter((m): m is MenuItem => !!m);
 
   return (
     <div className="page-home">
-      <HomeHero />
+      <HomeHero plate={shot(HERO_PLATE)} pour={shot(HERO_POUR)} />
 
       <div className="marquee" aria-label="What we make">
         <div className="marquee__track">
@@ -58,6 +63,35 @@ export default async function Home() {
       </div>
 
       <PlatePicker options={plates} />
+
+      <section className="story" data-parallax-section>
+        <div className="story__copy">
+          <p className="eyebrow" data-reveal>Made to order</p>
+          <h2 className="story__title" data-motion-text>Pressed fresh, <em>never waiting.</em></h2>
+          <p className="story__lead" data-reveal>
+            Nothing sits under a lamp. Every waffle, crepe and pancake goes on the iron the moment the
+            order lands, and the coffee bar runs alongside it — shakes, mojitos, frappes and espresso,
+            poured to match.
+          </p>
+          <p className="story__lead" data-reveal>
+            Two kitchens in Dubai, one phone number, and delivery across the city.
+          </p>
+          <Link className="btn btn--line btn--light" href="/visit" data-magnetic data-reveal>Find a kitchen</Link>
+        </div>
+        {/* 1536px intermediates, not the 1800-2000px originals: the shop origin is slow
+            enough that optimising the full files can time out. */}
+        <div className="story__grid">
+          <figure className="story__fig story__fig--a" data-image-reveal>
+            <Image src={`${UP}2023/10/waffle_crepe_breakfast__0002_RKW06191-1536x1536.jpg`} alt="A halloumi waffle served with rocket, tomato and dressing" width={1536} height={1536} sizes="(max-width: 900px) 92vw, 34vw" data-parallax-img />
+          </figure>
+          <figure className="story__fig story__fig--b" data-image-reveal>
+            <Image src={`${UP}2023/04/RKW05711-1536x1024.jpg`} alt="A layered iced latte beside a cup of coffee beans" width={1536} height={1024} sizes="(max-width: 900px) 46vw, 22vw" data-parallax-img />
+          </figure>
+          <figure className="story__fig story__fig--c" data-image-reveal>
+            <Image src={`${UP}2024/02/RKW05738-1536x1024.jpg`} alt="A cappuccino dusted with chocolate on a white saucer" width={1536} height={1024} sizes="(max-width: 900px) 46vw, 22vw" data-parallax-img />
+          </figure>
+        </div>
+      </section>
 
       <section className="offer" data-parallax-section>
         <div className="offer__waffle" aria-hidden="true" data-parallax-layer data-parallax-speed="0.25" />

@@ -1,16 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { gsap } from "@/components/motion/motion";
+import { useRef, useState } from "react";
+import { gsap, prefersReducedMotion } from "@/components/motion/motion";
 import { useCart } from "@/components/chrome/Cart";
 
-export type PlateOption = { preset: string; name: string; price: number; img: string };
+export type PlateOption = { name: string; price: number; img: string };
 
-/** "Pick your plate": choosing a dish re-tops the 3D waffle and counts the real price up. */
+/** "Pick your plate": choosing a dish cross-fades its real photo and counts the live price up. */
 export default function PlatePicker({ options }: { options: PlateOption[] }) {
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const scene = useRef<{ setPreset: (p: string) => void; dispose: () => void } | null>(null);
+  const shots = useRef<(HTMLElement | null)[]>([]);
   const priceEl = useRef<HTMLElement>(null);
   const badge = useRef<HTMLDivElement>(null);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
@@ -18,21 +17,27 @@ export default function PlatePicker({ options }: { options: PlateOption[] }) {
   const { add } = useCart();
   const sel = options[idx];
 
-  useEffect(() => {
-    let cancelled = false;
-    import("@/components/three/waffleScene").then(({ createWaffleScene }) => {
-      if (cancelled || !canvas.current) return;
-      try { scene.current = createWaffleScene(canvas.current, { preset: options[0].preset, tilt: 0.75, distance: 12.5 }); }
-      catch (err) { console.warn("WebGL unavailable", err); }
-    });
-    return () => { cancelled = true; scene.current?.dispose(); scene.current = null; };
-  }, [options]);
-
   const choose = (i: number) => {
+    if (i === idx) return;
     const from = { v: options[idx].price };
+    const prev = shots.current[idx];
+    const next = shots.current[i];
     setIdx(i);
-    scene.current?.setPreset(options[i].preset);
-    gsap.to(from, { v: options[i].price, duration: 0.6, ease: "power2.out", onUpdate: () => { if (priceEl.current) priceEl.current.textContent = String(Math.round(from.v)); } });
+
+    if (prefersReducedMotion()) {
+      gsap.set(prev, { autoAlpha: 0 });
+      gsap.set(next, { autoAlpha: 1, scale: 1 });
+    } else if (prev && next) {
+      gsap.to(prev, { autoAlpha: 0, scale: 0.94, duration: 0.45, ease: "power2.inOut" });
+      gsap.fromTo(next, { autoAlpha: 0, scale: 1.08 }, { autoAlpha: 1, scale: 1, duration: 0.7, ease: "power3.out" });
+    }
+
+    gsap.to(from, {
+      v: options[i].price,
+      duration: 0.6,
+      ease: "power2.out",
+      onUpdate: () => { if (priceEl.current) priceEl.current.textContent = String(Math.round(from.v)); },
+    });
     gsap.fromTo(badge.current, { scale: 0.92 }, { scale: 1, duration: 0.6, ease: "back.out(2)" });
   };
 
@@ -48,7 +53,18 @@ export default function PlatePicker({ options }: { options: PlateOption[] }) {
   return (
     <section className="plate" id="plate">
       <div className="plate__stage">
-        <canvas ref={canvas} aria-label={`3D preview of ${sel.name}`} />
+        <div className="plate__shots">
+          {options.map((o, i) => (
+            <figure
+              key={o.name}
+              className="plate__shot"
+              style={{ opacity: i === 0 ? 1 : 0, visibility: i === 0 ? "visible" : "hidden" }}
+              ref={(el) => { shots.current[i] = el; }}
+            >
+              {o.img && <Image src={o.img} alt={i === idx ? o.name : ""} fill sizes="(max-width: 860px) 88vw, 42vw" priority={i === 0} />}
+            </figure>
+          ))}
+        </div>
         <div className="plate__price" ref={badge} aria-live="polite">
           <span>{sel.name}</span>
           <strong>AED <b ref={priceEl}>{Math.round(sel.price)}</b></strong>
@@ -57,7 +73,7 @@ export default function PlatePicker({ options }: { options: PlateOption[] }) {
       <div className="plate__panel">
         <p className="eyebrow" data-reveal>Top recommendations</p>
         <h2 className="h2" data-motion-text>Pick your <em>plate.</em></h2>
-        <p className="lead" data-reveal>Tap a favourite and watch it get topped. Prices are live from our shop.</p>
+        <p className="lead" data-reveal>Tap a favourite to see it. Prices are live from our shop.</p>
         <ul className="picker" role="listbox" aria-label="Choose a dish" data-reveal-group>
           {options.map((o, i) => (
             <li key={o.name} data-reveal-item>

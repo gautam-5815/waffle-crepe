@@ -8,18 +8,15 @@ export const metadata: Metadata = {
   description: "The full Waffle n Crepe menu with live prices: waffles, crepes, pancakes, mini pancakes, kunafa specials, breakfast, sharing boxes, milkshakes, coffee and more.",
 };
 
-// Real waffles on the menu, each paired with a 3D topping preset for the hero.
-const NOW: [string, string][] = [
-  ["lotus", "Lotus Waffle"], ["nutty", "Nutty Waffle"], ["brownie", "Brownie Waffle"], ["pistachio", "Pistachio Waffle"],
-  ["kinder", "Kinder Waffle"], ["berry", "Mix Berries Waffle"], ["canadian", "Canadian Waffle"],
-];
+// Signature waffles shown in the hero, photographed; names must match the shop.
+const NOW = ["Lotus Waffle", "Nutty Waffle", "Brownie Waffle", "Pistachio Waffle", "Kinder Waffle", "Mix Berries Waffle", "Canadian Waffle"];
 
 export default async function MenuPage() {
   const menu = await getMenu();
   const groups = groupMenu(menu);
-  const now: NowItem[] = NOW.flatMap(([preset, name]) => {
+  const now: NowItem[] = NOW.flatMap((name) => {
     const item = findItem(menu, name);
-    return item ? [{ preset, name: item.name, price: item.price }] : [];
+    return item?.img ? [{ name: item.name, price: item.price, img: item.img }] : [];
   });
   const prices = menu.map((m) => m.price).filter(Boolean);
   const stats = {

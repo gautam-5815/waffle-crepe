@@ -27,6 +27,29 @@ const decode = (s = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+/**
+ * Typos in the shop's own product names. Applied to the live catalogue and the
+ * snapshot alike, so a re-synced snapshot keeps the corrections. Fix these in
+ * WooCommerce and the entries here can go.
+ */
+const NAME_FIXES: Record<string, string> = {
+  "Favorable Cepe": "Favorable Crepe",
+  "Favorable MIni Pancake": "Favorable Mini Pancake",
+  "Lotus MIni Pancake": "Lotus Mini Pancake",
+};
+
+/** WordPress appends -WxH to resized copies; strip it to get the full-resolution original. */
+const fullSize = (url: string) => url.replace(/-\d+x\d+(?=\.[a-z]+$)/i, "");
+
+/** Corrects the product name and upgrades the photo to its full-resolution original. */
+const normalize = (item: MenuItem): MenuItem => {
+  const name = NAME_FIXES[item.name] ?? item.name;
+  const img = item.img ? fullSize(item.img) : item.img;
+  return name === item.name && img === item.img ? item : { ...item, name, img };
+};
+
+const normalizeAll = (items: MenuItem[]) => items.map(normalize);
+
 type StoreProduct = {
   name: string;
   type: string;
@@ -34,7 +57,7 @@ type StoreProduct = {
   short_description?: string;
   prices: { price: string; regular_price: string; currency_minor_unit: number };
   categories?: { name: string }[];
-  images?: { thumbnail?: string }[];
+  images?: { src?: string; thumbnail?: string }[];
 };
 
 /**
@@ -63,17 +86,18 @@ export async function getMenu(): Promise<MenuItem[]> {
           price: Number(p.prices.price) / unit,
           was: Number(p.prices.regular_price) / unit,
           cats: (p.categories ?? []).map((c) => decode(c.name)).filter(Boolean),
-          img: p.images?.[0]?.thumbnail ?? "",
+          img: p.images?.[0]?.src ?? "",
           note: decode(p.short_description).slice(0, 80),
           url: p.permalink,
           options: p.type === "variable",
         };
       })
       // Barbie-branded specials are a third-party trademark; keep them off the redesign.
-      .filter((i) => !i.cats.includes("Barbie Specials") && !/barbie/i.test(i.name));
-    return items.length ? items : (snapshot as MenuItem[]);
+      .filter((i) => !i.cats.includes("Barbie Specials") && !/barbie/i.test(i.name))
+      .map(normalize);
+    return items.length ? items : normalizeAll(snapshot as MenuItem[]);
   } catch {
-    return snapshot as MenuItem[];
+    return normalizeAll(snapshot as MenuItem[]);
   }
 }
 

@@ -76,6 +76,19 @@ export function initReveals(root: ParentNode = document) {
   });
 }
 
+/** Photographs drift slowly inside their frames as the page scrolls. */
+export function initParallaxImages(root: ParentNode = document) {
+  if (prefersReducedMotion()) return;
+  root.querySelectorAll<HTMLElement>("[data-parallax-img]").forEach((img) => {
+    const frame = img.parentElement;
+    if (!frame || !img.getClientRects().length) return;
+    gsap.fromTo(img, { yPercent: -8, scale: 1.18 }, {
+      yPercent: 8, ease: "none",
+      scrollTrigger: { trigger: frame, start: "top bottom", end: "bottom top", scrub: 1.2, invalidateOnRefresh: true },
+    });
+  });
+}
+
 type Cleanup = () => void;
 
 export function initMagnetic(root: ParentNode = document): Cleanup {

@@ -1,73 +1,73 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { gsap, ScrollTrigger, prefersReducedMotion, isCoarsePointer } from "@/components/motion/motion";
+import { gsap, prefersReducedMotion, isCoarsePointer } from "@/components/motion/motion";
 import { useLenis } from "@/components/motion/SmoothScroll";
 
-/** Hero with the live 3D waffle, first-visit loader and intro choreography. */
-export default function HomeHero() {
+export type HeroShot = { src: string; alt: string };
+
+/** Hero built on real product photography, with a first-visit loader and intro choreography. */
+export default function HomeHero({ plate, pour }: { plate: HeroShot; pour: HeroShot }) {
   const root = useRef<HTMLElement>(null);
-  const canvas = useRef<HTMLCanvasElement>(null);
   const lenis = useLenis();
   const [loader, setLoader] = useState<"show" | "hide" | "gone">("show");
 
-  // 3D scene (client-only; three.js is loaded lazily so it never blocks first paint).
-  useEffect(() => {
-    let scene: { setPointer: (x: number, y: number) => void; setScroll: (p: number) => void; dispose: () => void } | undefined;
-    let cancelled = false;
-    let st: ScrollTrigger | undefined;
-    const move = (e: PointerEvent) => scene?.setPointer(e.clientX / window.innerWidth - 0.5, e.clientY / window.innerHeight - 0.5);
-    import("@/components/three/waffleScene").then(({ createWaffleScene }) => {
-      if (cancelled || !canvas.current) return;
-      try {
-        scene = createWaffleScene(canvas.current, { particles: true, preset: "berry", tilt: 0.62, distance: 12.5 });
-      } catch (err) { console.warn("WebGL unavailable", err); return; }
-      if (!isCoarsePointer()) window.addEventListener("pointermove", move);
-      if (!prefersReducedMotion()) {
-        st = ScrollTrigger.create({ trigger: root.current, start: "top top", end: "bottom top", scrub: 1, onUpdate: (s) => scene?.setScroll(s.progress) });
-      }
-    });
-    return () => { cancelled = true; st?.kill(); window.removeEventListener("pointermove", move); scene?.dispose(); };
-  }, []);
-
-  // Loader (first visit per session) → intro timeline.
+  // Loader (first visit per session) → intro timeline → scroll parallax.
   useEffect(() => {
     const reduce = prefersReducedMotion();
     const seen = sessionStorage.getItem("wnc-loaded");
+    let cancelled = false;
     const ctx = gsap.context(() => {
       const intro = () => {
-        if (reduce) { gsap.set(".hero__in", { autoAlpha: 1 }); return; }
-        gsap.timeline({ delay: 0.1 })
-          .from(".hero__canvas", { autoAlpha: 0, scale: 0.7, rotate: -20, duration: 1.6, ease: "expo.out" })
-          .from(".hero__title .line > span", { yPercent: 110, duration: 1.1, ease: "power4.out", stagger: 0.12 }, 0.25)
-          .fromTo(".hero__in", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.9 }, 0.6)
-          .from(".hero__badge", { scale: 0, rotate: -90, duration: 1, ease: "back.out(1.6)" }, 0.9);
-        gsap.to(".hero__canvas", { yPercent: -30, scale: 0.85, ease: "none", scrollTrigger: { trigger: root.current, start: "top top", end: "bottom top", scrub: 1.2 } });
+        if (reduce) {
+          gsap.set(".hero__in, .hero__plate, .hero__pour", { autoAlpha: 1 });
+          return;
+        }
+        gsap
+          .timeline({ delay: 0.1 })
+          .fromTo(".hero__plate", { autoAlpha: 0, clipPath: "inset(0 0 100% 0)" }, { autoAlpha: 1, clipPath: "inset(0 0 0% 0)", duration: 1.5, ease: "expo.out" })
+          .fromTo(".hero__plate img", { scale: 1.3 }, { scale: 1, duration: 1.8, ease: "expo.out" }, 0)
+          .fromTo(".hero__title .line > span", { yPercent: 110 }, { yPercent: 0, duration: 1.1, ease: "power4.out", stagger: 0.12 }, 0.25)
+          .fromTo(".hero__in", { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.9 }, 0.55)
+          .fromTo(".hero__pour", { autoAlpha: 0, y: 48, scale: 0.9 }, { autoAlpha: 1, y: 0, scale: 1, duration: 1.2, ease: "expo.out" }, 0.7)
+          .fromTo(".hero__badge", { scale: 0, rotate: -90 }, { scale: 1, rotate: 0, duration: 1, ease: "back.out(1.6)" }, 0.95);
+
+        // The two photographs drift apart as the hero scrolls away.
+        const scrub = { trigger: root.current, start: "top top", end: "bottom top", scrub: 1.1 };
+        gsap.to(".hero__plate", { yPercent: -16, scale: 1.06, ease: "none", scrollTrigger: scrub });
+        gsap.to(".hero__pour", { yPercent: -46, ease: "none", scrollTrigger: scrub });
+        gsap.to(".hero__copy", { yPercent: 18, autoAlpha: 0.25, ease: "none", scrollTrigger: scrub });
       };
       if (seen || reduce) { setLoader("gone"); intro(); return; }
       lenis?.stop();
       const wait = Promise.race([document.fonts.ready.then(() => new Promise((r) => setTimeout(r, 500))), new Promise((r) => setTimeout(r, 1600))]);
       wait.then(() => {
+        if (cancelled) return;
         sessionStorage.setItem("wnc-loaded", "1");
         setLoader("hide");
         setTimeout(() => { setLoader("gone"); lenis?.start(); }, 900);
         intro();
       });
     }, root);
-    return () => ctx.revert();
+    return () => { cancelled = true; ctx.revert(); };
   }, [lenis]);
 
-  // Badge drifts slightly with the pointer.
+  // Photographs and badge drift gently with the pointer.
   useEffect(() => {
     if (prefersReducedMotion() || isCoarsePointer()) return;
     const section = root.current!;
-    const badge = section.querySelector<HTMLElement>(".hero__badge")!;
-    const x = gsap.quickTo(badge, "x", { duration: 0.8 }), y = gsap.quickTo(badge, "y", { duration: 0.8 });
+    const drift = [...section.querySelectorAll<HTMLElement>("[data-drift]")].map((el) => ({
+      depth: Number(el.dataset.drift) || 1,
+      x: gsap.quickTo(el, "x", { duration: 0.9, ease: "power3.out" }),
+      y: gsap.quickTo(el, "y", { duration: 0.9, ease: "power3.out" }),
+    }));
     const onMove = (e: PointerEvent) => {
       const r = section.getBoundingClientRect();
-      x((e.clientX - r.width / 2) * 0.03);
-      y((e.clientY - r.top - r.height / 2) * 0.03);
+      const dx = e.clientX - r.width / 2;
+      const dy = e.clientY - r.top - r.height / 2;
+      drift.forEach((d) => { d.x(dx * 0.012 * d.depth); d.y(dy * 0.012 * d.depth); });
     };
     section.addEventListener("pointermove", onMove);
     return () => section.removeEventListener("pointermove", onMove);
@@ -82,7 +82,7 @@ export default function HomeHero() {
         </div>
       )}
       <div className="hero__grid" aria-hidden="true" />
-      <canvas ref={canvas} className="hero__canvas" aria-label="A 3D waffle topped with strawberries, blueberries and syrup, slowly turning" />
+
       <div className="hero__copy">
         <p className="eyebrow hero__in">Dubai Silicon Oasis · The Sustainable City</p>
         <h1 className="hero__title">
@@ -95,12 +95,21 @@ export default function HomeHero() {
           <Link className="btn btn--line" href="/menu" data-magnetic>See the menu</Link>
         </div>
       </div>
-      <div className="hero__badge hero__in">
+
+      <div className="hero__art" aria-hidden={false}>
+        <figure className="hero__plate" data-drift="1">
+          <Image src={plate.src} alt={plate.alt} fill priority sizes="(max-width: 860px) 92vw, 46vw" />
+        </figure>
+        <figure className="hero__pour" data-drift="2.2">
+          <Image src={pour.src} alt={pour.alt} fill sizes="(max-width: 860px) 40vw, 18vw" />
+        </figure>
+      </div>
+
+      <div className="hero__badge hero__in" data-drift="1.6">
         <strong>Buy 2,<br />get 1 free</strong>
         <span>every weekday*</span>
       </div>
       <div className="hero__scroll hero__in" aria-hidden="true"><span />Scroll</div>
-      <p className="hero__hint hero__in" aria-hidden="true">Move your cursor — the waffle follows</p>
     </section>
   );
 }

@@ -8,7 +8,7 @@ import { useLenis, scrollToEl } from "@/components/motion/SmoothScroll";
 import PageMotion from "@/components/motion/PageMotion";
 import { useCart } from "@/components/chrome/Cart";
 
-export type NowItem = { preset: string; name: string; price: number };
+export type NowItem = { name: string; price: number; img: string };
 const money = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
 
 function Card({ item, wide }: { item: MenuItem; wide: boolean }) {
@@ -57,8 +57,7 @@ export default function MenuClient({ groups, now, stats }: { groups: MenuGroup[]
   const [active, setActive] = useState(groups[0]?.cats[0]?.slug ?? "");
   const [nowIdx, setNowIdx] = useState(0);
   const chipsRef = useRef<HTMLElement>(null);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const scene = useRef<{ setPreset: (p: string) => void; dispose: () => void } | null>(null);
+  const nowShots = useRef<(HTMLElement | null)[]>([]);
   const heroRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -67,22 +66,21 @@ export default function MenuClient({ groups, now, stats }: { groups: MenuGroup[]
     .filter((g) => g.cats.length), [groups, q]);
   const shown = filtered.reduce((n, g) => n + g.cats.reduce((k, c) => k + c.items.length, 0), 0);
 
-  // Hero 3D waffle cycles through real waffles.
-  useEffect(() => {
-    let cancelled = false;
-    import("@/components/three/waffleScene").then(({ createWaffleScene }) => {
-      if (cancelled || !canvas.current) return;
-      try { scene.current = createWaffleScene(canvas.current, { preset: now[0]?.preset ?? "lotus", tilt: 0.7, distance: 11.5, particles: true }); }
-      catch (err) { console.warn("WebGL unavailable", err); }
-    });
-    return () => { cancelled = true; scene.current?.dispose(); scene.current = null; };
-  }, [now]);
+  // The hero photo cycles slowly through what is on the iron right now.
   useEffect(() => {
     if (prefersReducedMotion() || now.length < 2) return;
-    const id = setInterval(() => { if (!document.hidden) setNowIdx((i) => (i + 1) % now.length); }, 3600);
+    const id = setInterval(() => { if (!document.hidden) setNowIdx((i) => (i + 1) % now.length); }, 4200);
     return () => clearInterval(id);
   }, [now.length]);
-  useEffect(() => { if (now[nowIdx]) scene.current?.setPreset(now[nowIdx].preset); }, [nowIdx, now]);
+  useEffect(() => {
+    const shown = nowShots.current[nowIdx];
+    if (!shown) return;
+    nowShots.current.forEach((el, i) => {
+      if (!el || i === nowIdx) return;
+      gsap.to(el, { autoAlpha: 0, scale: 1.04, duration: 0.7, ease: "power2.inOut", overwrite: true });
+    });
+    gsap.fromTo(shown, { autoAlpha: 0, scale: 1.1 }, { autoAlpha: 1, scale: 1, duration: 1.1, ease: "power3.out", overwrite: true });
+  }, [nowIdx]);
 
   // Hero intro.
   useEffect(() => {
@@ -151,7 +149,18 @@ export default function MenuClient({ groups, now, stats }: { groups: MenuGroup[]
           </dl>
         </div>
         <div className="mhero__stage mhero__in">
-          <canvas ref={canvas} aria-hidden="true" />
+          <div className="mhero__shots">
+            {now.map((o, i) => (
+              <figure
+                key={o.name}
+                className="mhero__shot"
+                style={{ opacity: i === 0 ? 1 : 0, visibility: i === 0 ? "visible" : "hidden" }}
+                ref={(el) => { nowShots.current[i] = el; }}
+              >
+                <Image src={o.img} alt={i === nowIdx ? o.name : ""} fill priority={i === 0} sizes="(max-width: 900px) 88vw, 44vw" />
+              </figure>
+            ))}
+          </div>
           {n && (
             <button className="mhero__now" onClick={jumpToNow}>
               <span>Now on the iron</span>

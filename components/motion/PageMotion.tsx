@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { gsap, ScrollTrigger, initReveals, initMagnetic, initTilt } from "./motion";
+import { gsap, ScrollTrigger, initReveals, initMagnetic, initTilt, initParallaxImages } from "./motion";
 
 /**
  * Runs the shared reveal / magnetic / tilt system over the current page once it has rendered.
@@ -20,6 +20,7 @@ export default function PageMotion({ deps = [] as unknown[], scope }: { deps?: u
       if (!root) return;
       ctx = gsap.context(() => {
         initReveals(root);
+        initParallaxImages(root);
         offMag = initMagnetic(root);
         offTilt = initTilt(root);
       });

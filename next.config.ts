@@ -28,6 +28,10 @@ const nextConfig: NextConfig = {
   images: {
     // Product photos come straight from the WooCommerce media library.
     remotePatterns: [new URL("https://wafflencrepe.com/wp-content/uploads/**")],
+    // We now request the full-resolution originals, so the first optimisation of each
+    // image is comparatively slow. The shop's photos rarely change, so hold the
+    // optimised copies for 30 days rather than re-fetching and re-encoding them.
+    minimumCacheTTL: 60 * 60 * 24 * 30,
   },
 };
 

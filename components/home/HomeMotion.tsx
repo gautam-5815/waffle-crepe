@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { gsap, prefersReducedMotion } from "@/components/motion/motion";
 
-/** Home-only scroll effects: pinned horizontal family-box gallery, offer parallax, breakfast drift. */
+/** Home-only scroll effects: pinned family-box gallery, offer parallax, breakfast drift. */
 export default function HomeMotion() {
   useEffect(() => {
     if (prefersReducedMotion()) return;
