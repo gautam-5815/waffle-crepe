@@ -27,25 +27,15 @@ function km(a: { lat: number; lon: number }, b: { lat: number; lon: number }) {
   return 2 * 6371 * Math.asin(Math.sqrt(h));
 }
 
-/** Click-to-load Google Map, so nothing third-party loads until asked. */
-function MapLoad({ src, label }: { src: string; label: string }) {
-  const [on, setOn] = useState(false);
-  if (on) return <iframe src={src} title={label} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />;
-  return (
-    <button className="mapload" onClick={() => setOn(true)} aria-label={`Load Google Map for ${label}`}>
-      <span className="mapload__grid" aria-hidden="true" />
-      <span className="mapload__pin" aria-hidden="true" />
-      <span className="mapload__cta">Tap to load the map</span>
-      <small>Loads Google Maps</small>
-    </button>
-  );
+/** Google Map for one kitchen. Lazy so it only fetches once scrolled near. */
+function KitchenMap({ src, label }: { src: string; label: string }) {
+  return <iframe src={src} title={`Map of ${label}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />;
 }
 
 export default function VisitKitchens() {
   const lenis = useLenis();
   const heroRef = useRef<HTMLElement>(null);
-  const canvas = useRef<HTMLCanvasElement>(null);
-  const labels = useRef<HTMLDivElement>(null);
+  const mapEl = useRef<HTMLDivElement>(null);
   const map = useRef<{ focus: (i: number) => void; dispose: () => void } | null>(null);
   const [focused, setFocused] = useState(-1);
   const [finding, setFinding] = useState(false);
@@ -56,15 +46,15 @@ export default function VisitKitchens() {
 
   useEffect(() => {
     let cancelled = false;
-    import("@/components/three/cityMap").then(({ createCityMap }) => {
-      if (cancelled || !canvas.current || !labels.current) return;
+    import("@/components/visit/cityMap").then(({ createCityMap }) => {
+      if (cancelled || !mapEl.current) return;
       const places = PLACES.map((p, i) => ({
         ...p,
         onSelect: () => { setFocused(i); map.current?.focus(i); scrollToEl(lenis, document.getElementById(p.id)); },
       }));
-      try { map.current = createCityMap(canvas.current, labels.current, places); }
-      catch (err) { console.warn("WebGL unavailable", err); }
-    });
+      try { map.current = createCityMap(mapEl.current, places); }
+      catch (err) { console.warn("Map failed to load", err); }
+    }).catch((err) => console.warn("Map module failed to load", err));
     return () => { cancelled = true; map.current?.dispose(); map.current = null; };
   }, [lenis]);
 
@@ -123,14 +113,12 @@ export default function VisitKitchens() {
           </div>
         </div>
         <div className="vhero__map vhero__in">
-          <canvas ref={canvas} aria-label="Illustrated 3D map of Dubai built from waffle cells, with pins on both kitchens" />
-          <div className="maplabels" ref={labels} />
+          <div className="vhero__canvas" ref={mapEl} role="application" aria-label="Map of Dubai with both Waffle n Crepe kitchens pinned" />
           <div className="vhero__mapctl">
             {[["Both", -1], ["Silicon Oasis", 0], ["Sustainable City", 1]].map(([label, i]) => (
               <button key={label} aria-pressed={focused === i} onClick={() => focus(i as number)}>{label}</button>
             ))}
           </div>
-          <p className="vhero__note">Illustrated map — not to scale</p>
         </div>
       </section>
 
@@ -151,7 +139,7 @@ export default function VisitKitchens() {
               </p>
             </div>
             <figure className="kitchen__map" data-reveal>
-              <MapLoad src={p.embed} label={p.name.join(" ")} />
+              <KitchenMap src={p.embed} label={p.name.join(" ")} />
             </figure>
           </article>
         ))}
