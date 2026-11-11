@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getMenu, findItem, money, slugify, type MenuItem } from "@/lib/menu";
-import HomeHero, { type HeroShot } from "@/components/home/HomeHero";
+import { getMenu, findItem, groupMenu, money, slugify, type MenuItem } from "@/lib/menu";
+import HeroWalkthrough from "@/components/home/HeroWalkthrough";
 import PlatePicker, { type PlateOption } from "@/components/home/PlatePicker";
 import HomeMotion from "@/components/home/HomeMotion";
 import PageMotion from "@/components/motion/PageMotion";
@@ -18,10 +18,6 @@ const PLATES: { name: string; fallback: number; img: string }[] = [
   { name: "Pistachio Pancake", fallback: 50, img: `${UP}2023/04/pistachio_pan-315x473.webp` },
   { name: "Canadian Pancake", fallback: 38, img: `${UP}2023/04/canadian-1-315x473.webp` },
 ];
-
-// Hero photography: real shop photos, taken live so they track the shop, with pinned fallbacks.
-const HERO_PLATE = { name: "Four Season Waffle", src: `${UP}2023/04/fourseason-1.webp`, alt: "A Four Season waffle topped with strawberries, kiwi, banana and chocolate sauce" };
-const HERO_POUR = { name: "Pistachio Milkshake", src: `${UP}2023/04/pistachio_milkshake.webp`, alt: "A tall pistachio milkshake topped with cream" };
 
 const BREAKFAST = ["Halloumi Waffle", "Egg Waffle", "Tuna Sandwich", "Mixed Cheese Sandwich"];
 const DRINKS = [
@@ -42,13 +38,33 @@ export default async function Home() {
     const live = findItem(menu, p.name);
     return { name: p.name, price: live?.price ?? p.fallback, img: live?.img || p.img };
   });
-  const shot = (h: typeof HERO_PLATE): HeroShot => ({ src: findItem(menu, h.name)?.img || h.src, alt: h.alt });
   const boxes = menu.filter((m) => m.cats.includes("Sharing Box")).sort((a, b) => Number(b.was > b.price) - Number(a.was > a.price));
+  // Same grouping the menu page uses, so the home counts and anchors match what
+  // a visitor lands on. Raw item.cats undercounts: uncategorised shop items are
+  // folded into Waffles by groupMenu, not by the feed.
+  const cats = Object.fromEntries(
+    groupMenu(menu).flatMap((g) => g.cats.map((c) => [c.key, c] as const))
+  );
   const breakfast = BREAKFAST.map((n) => findItem(menu, n)).filter((m): m is MenuItem => !!m);
 
   return (
     <div className="page-home">
-      <HomeHero plate={shot(HERO_PLATE)} pour={shot(HERO_POUR)} />
+      <HeroWalkthrough />
+
+      {/* The walkthrough carries no text, so the page's opening copy lives here. */}
+      <section className="intro">
+        <p className="eyebrow" data-reveal>Dubai Silicon Oasis · The Sustainable City</p>
+        <h1 className="intro__title" data-motion-text>Golden grids, <em>made to order.</em></h1>
+        <p className="intro__sub" data-reveal>
+          Waffles, crepes and pancakes cooked the moment you order — with shakes, mojitos and
+          coffee to match. Delivered across Dubai.
+        </p>
+        <div className="intro__ctas" data-reveal>
+          <a className="btn btn--gold" href="https://wafflencrepe.com/shop/" data-magnetic data-cursor-label="Shop">Order online</a>
+          <Link className="btn btn--line" href="/menu" data-magnetic>See the menu</Link>
+        </div>
+        <p className="intro__offer" data-reveal><strong>Buy 2, get 1 free</strong> every weekday*</p>
+      </section>
 
       <div className="marquee" aria-label="What we make">
         <div className="marquee__track">
@@ -149,12 +165,27 @@ export default async function Home() {
       </section>
 
       <section className="cats">
-        <h2 className="h2" data-motion-text>The whole <em>grid.</em></h2>
+        <div className="cats__head">
+          <h2 className="h2" data-motion-text>The whole <em>grid.</em></h2>
+          <p className="cats__lead" data-reveal>
+            Eleven categories, {menu.length} dishes and drinks — every one cooked to order.
+          </p>
+        </div>
         <ul className="cats__grid" data-reveal-group>
-          {CATS.map((c) => (
-            <li data-reveal-item key={c}><Link href={`/menu#${slugify(c)}`}>{c === "Crepe" ? "Crepes" : c === "Milk Shakes" ? "Milkshakes" : c}</Link></li>
+          {CATS.map((c) => cats[c]).filter(Boolean).map((c) => (
+            <li data-reveal-item key={c.key}>
+              <Link href={`/menu#${c.slug}`}>
+                <span className="cats__name">{c.label}</span>
+                <span className="cats__n">{c.items.length}</span>
+              </Link>
+            </li>
           ))}
-          <li data-reveal-item className="cats__cta"><Link href="/menu">See the full menu →</Link></li>
+          <li data-reveal-item className="cats__cta">
+            <Link href="/menu">
+              <span className="cats__name">See the full menu</span>
+              <span className="cats__arrow" aria-hidden="true">→</span>
+            </Link>
+          </li>
         </ul>
       </section>
 

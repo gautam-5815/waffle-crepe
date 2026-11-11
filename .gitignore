@@ -43,3 +43,7 @@ next-env.d.ts
 
 # local Claude preview config
 .claude/
+
+# Source frame export for the hero walkthrough. public/frames is built from it
+# (resampled and re-encoded); the 43 MB originals stay local.
+/public/Frame/

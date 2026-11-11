@@ -88,6 +88,15 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
   transition: background .4s var(--ease), box-shadow .4s var(--ease), transform .5s var(--ease);
 }
 .nav.is-solid { background: rgba(255, 246, 230, .86); backdrop-filter: blur(14px); box-shadow: 0 1px 0 rgba(42, 22, 11, .08); }
+/* Over the home walkthrough the nav is see-through on live footage, so it
+   carries its own shade rather than a scrim across the animation. */
+body:has(.page-home) .nav:not(.is-solid) { color: var(--cream); }
+body:has(.page-home) .nav:not(.is-solid)::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(14, 8, 3, .62), rgba(14, 8, 3, 0));
+}
+body:has(.page-home) .nav:not(.is-solid) .cart { border-color: var(--cream); }
+body:has(.page-home) .nav:not(.is-solid) .burger span { background: var(--cream); }
 .nav.is-hidden { transform: translateY(-100%); }
 .nav__logo { display: block; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 18px rgba(42, 22, 11, .12); transition: transform .5s var(--ease); }
 .nav__logo:hover { transform: rotate(-6deg) scale(1.04); }
@@ -122,91 +131,55 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
 .mmenu__foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-weight: 700; }
 .mmenu__foot .btn { --bg: var(--ink); --fg: var(--gold); }
 
-/* Hero */
-.hero {
+/* Hero: a scroll-driven walk into the café. No text, no overlays — the
+   animation is the whole hero, and scrolling is the only thing that moves it. */
+.walk {
   position: relative;
-  min-height: 100svh;
-  display: grid;
-  grid-template-columns: 1.05fr 1fr;
-  align-items: center;
-  padding: 7rem var(--gutter) 4rem;
+  width: 100%;
+  height: 100svh;
   overflow: hidden;
-  background: radial-gradient(120% 90% at 78% 40%, #FFE3A3 0%, var(--cream) 55%);
+  background: #0E0803;
 }
-.hero__grid {
+.walk__canvas, .walk__video, .walk__backdrop {
   position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(200, 105, 28, .09) 2px, transparent 2px),
-    linear-gradient(90deg, rgba(200, 105, 28, .09) 2px, transparent 2px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(70% 70% at 70% 45%, #000 20%, transparent 75%);
-  pointer-events: none;
+  width: 100%; height: 100%;
+  display: block;
 }
-/* Hero photography: a large plated shot with a smaller drink offset in front. */
-.hero__art {
-  position: absolute; right: -1vw; top: 50%;
-  width: min(56vw, 100svh, 900px); height: min(56vw, 100svh, 900px);
-  transform: translateY(-50%);
-  z-index: 1;
-  pointer-events: none;
+.walk__canvas { object-fit: cover; }
+/* The stand-in clip is portrait. Shown whole and centred, with a blurred copy
+   of itself filling the rest of a wide screen rather than cropping it away. */
+.walk__video { object-fit: contain; z-index: 1; }
+.walk__backdrop {
+  object-fit: cover;
+  z-index: 0;
+  filter: blur(34px) brightness(.55) saturate(1.1);
+  transform: scale(1.18);
 }
-.hero__plate {
-  position: absolute; inset: 0;
-  margin: 0;
-  border-radius: 999px 999px 32px 32px;
-  overflow: hidden;
-  box-shadow: 0 50px 90px -40px rgba(42, 22, 11, .45), 0 0 0 1px rgba(42, 22, 11, .05);
-  visibility: hidden;
+/* Once the screen is as tall as it is wide, the clip fills it on its own. */
+@media (max-aspect-ratio: 1 / 1) {
+  .walk__video { object-fit: cover; }
+  .walk__backdrop { display: none; }
 }
-.hero__plate img { object-fit: cover; }
-.hero__pour {
-  position: absolute; left: -6%; bottom: 2%;
-  width: 34%; aspect-ratio: 3 / 4;
-  margin: 0;
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 32px 60px -28px rgba(42, 22, 11, .5);
-  border: 6px solid var(--cream);
-  visibility: hidden;
-}
-.hero__pour img { object-fit: cover; }
-.hero__copy { position: relative; z-index: 2; max-width: 46rem; }
-.hero__title {
-  font-size: var(--step-hero);
-  line-height: .88;
-  letter-spacing: -.05em;
-  font-weight: 800;
-  margin: 0 0 1.6rem;
-}
-.hero__title .line { display: block; overflow: hidden; padding-bottom: .06em; }
-.hero__title .line > span { display: inline-block; }
-.hero__title em { color: var(--syrup); letter-spacing: -.02em; }
-.hero__sub { font-size: var(--step-1); max-width: 30ch; color: var(--ink-soft); margin: 0 0 2.2rem; }
-.hero__ctas { display: flex; flex-wrap: wrap; gap: .8rem; }
-.hero__badge {
-  position: absolute; z-index: 3;
-  right: calc(var(--gutter) + 2vw); bottom: 9vh;
-  width: 150px; height: 150px; border-radius: 50%;
-  background: var(--berry); color: #fff;
-  display: grid; place-content: center; text-align: center;
-  rotate: -12deg;
-  box-shadow: 0 20px 40px rgba(215, 38, 61, .3);
-}
-.hero__badge strong { font-size: 1.25rem; line-height: 1; font-weight: 800; }
-.hero__badge span { font-size: .78rem; margin-top: .3rem; opacity: .9; }
-.hero__hint { position: absolute; left: 50%; bottom: 3.2rem; transform: translateX(-50%); font-size: .8rem; color: var(--ink-soft); z-index: 2; margin: 0; }
 
-@media (max-width: 860px) {
-  .hero { grid-template-columns: 1fr; align-items: end; padding-top: 6rem; }
-  .hero__art { width: 86vw; height: 86vw; right: 2vw; top: 4.5rem; transform: none; }
-  .hero__plate { border-radius: 999px 999px 24px 24px; }
-  /* The plate carries the hero on a phone; the drink inset would only crowd it. */
-  .hero__pour { display: none; }
-  .hero__copy { margin-top: 82vw; }
-  .hero__badge { width: 112px; height: 112px; top: 6.5rem; bottom: auto; right: var(--gutter); }
-  .hero__badge strong { font-size: 1rem; }
-  .hero__hint { display: none; }
+/* The page's opening copy, directly under the walkthrough. */
+.intro {
+  position: relative; z-index: 4;
+  background: var(--cream);
+  padding: clamp(4rem, 9vw, 7.5rem) var(--gutter) clamp(3rem, 6vw, 5rem);
+  /* The motion system turns [data-reveal] into inline-block, so each line
+     needs its own grid row or they sit side by side. */
+  display: grid; justify-items: start;
 }
+.intro__title {
+  font-size: var(--step-hero);
+  line-height: .88; letter-spacing: -.05em; font-weight: 800;
+  margin: .8rem 0 1.6rem; max-width: 18ch;
+}
+.intro__title em { color: var(--syrup); letter-spacing: -.02em; }
+.intro__sub { font-size: var(--step-1); max-width: 42ch; color: var(--ink-soft); margin: 0 0 2.2rem; }
+.intro__ctas { display: flex; flex-wrap: wrap; gap: .8rem; }
+.intro__offer { margin: 2rem 0 0; font-size: .92rem; color: var(--ink-soft); }
+.intro__offer strong { color: var(--berry); }
 
 /* Story: editorial collage of real shop photography on a dark band. */
 .story {
@@ -380,30 +353,68 @@ em { font-family: var(--font-serif); font-style: italic; font-weight: 400; }
 .drink figcaption { font-weight: 800; padding: .8rem .3rem .2rem; font-size: 1.1rem; }
 @media (max-width: 860px) { .drinks__row { grid-template-columns: repeat(2, 1fr); } }
 
-/* Categories — the waffle grid */
+/* Categories — a waffle iron: cream squares pressed into a gold plate.
+   Eleven categories plus the menu link fill a 4x3 grid exactly. */
 .cats { padding: clamp(6rem, 12vw, 10rem) var(--gutter); }
+.cats__head {
+  display: grid; grid-template-columns: 1fr minmax(0, 34ch);
+  align-items: end; gap: .4rem 3rem;
+}
+.cats__head .h2 { margin: 0; }
+.cats__lead {
+  margin: 0; color: var(--ink-soft); font-size: var(--step-1); line-height: 1.5;
+  text-wrap: pretty;
+}
 .cats__grid {
-  list-style: none; margin: 2rem 0 0; padding: 14px;
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+  list-style: none; margin: 2.6rem 0 0; padding: 12px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
   background: var(--gold-deep);
-  border-radius: 40px;
-  box-shadow: inset 0 -10px 0 rgba(42, 22, 11, .15);
+  border-radius: 36px;
+  /* Lip of the iron: lit along the top edge, heavy along the bottom. */
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35), inset 0 -10px 0 rgba(42, 22, 11, .16);
 }
 .cats__grid a {
-  display: flex; align-items: flex-end;
-  min-height: clamp(110px, 13vw, 170px);
-  padding: 1.2rem;
-  background: var(--gold);
-  border-radius: 20px;
-  box-shadow: inset 0 6px 14px rgba(42, 22, 11, .18);
-  font-size: clamp(1.15rem, 2vw, 1.7rem); font-weight: 800; letter-spacing: -.02em;
+  display: flex; align-items: center; justify-content: space-between; gap: .9rem;
+  min-height: clamp(84px, 9vw, 116px);
+  padding: 1rem 1.1rem 1rem 1.25rem;
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 5px 14px rgba(42, 22, 11, .16);
+  font-size: clamp(1rem, 1.35vw, 1.3rem); font-weight: 800; letter-spacing: -.02em;
+  line-height: 1.15;
   text-decoration: none;
-  transition: background .4s var(--ease), color .4s var(--ease), transform .4s var(--ease);
+  transition: background .4s var(--ease), color .4s var(--ease), transform .4s var(--ease), box-shadow .4s var(--ease);
 }
-.cats__grid a:hover { background: var(--ink); color: var(--gold); transform: translateY(-3px); }
+.cats__name { text-wrap: balance; }
+/* Count pill: real stock from the live menu, not decoration. */
+.cats__n {
+  flex: none; min-width: 2.1em; padding: .2em .55em;
+  border-radius: 999px;
+  background: var(--gold); color: var(--ink);
+  font-size: .72em; font-weight: 700; letter-spacing: 0; text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: background .4s var(--ease), color .4s var(--ease);
+}
+.cats__grid a:hover {
+  background: var(--ink); color: var(--cream);
+  transform: translateY(-4px);
+  box-shadow: 0 14px 26px rgba(42, 22, 11, .28);
+}
+.cats__grid a:hover .cats__n { background: var(--gold); color: var(--ink); }
+
 .cats__cta a { background: var(--ink); color: var(--gold); }
+.cats__arrow { flex: none; transition: transform .4s var(--ease); }
 .cats__cta a:hover { background: var(--berry); color: #fff; }
-@media (max-width: 760px) { .cats__grid { grid-template-columns: repeat(2, 1fr); border-radius: 28px; } }
+.cats__cta a:hover .cats__arrow { transform: translateX(4px); }
+
+@media (max-width: 980px) {
+  .cats__head { grid-template-columns: 1fr; gap: 1rem; }
+}
+@media (max-width: 760px) {
+  .cats__grid { grid-template-columns: repeat(2, 1fr); border-radius: 26px; padding: 10px; gap: 10px; }
+  .cats__grid a { min-height: 76px; border-radius: 15px; padding: .85rem .95rem; }
+}
 
 /* Visit */
 .visit { background: var(--ink); color: var(--cream); padding: clamp(6rem, 12vw, 10rem) var(--gutter); }
@@ -445,7 +456,6 @@ html.has-motion [data-motion-text],
 html.has-motion [data-reveal],
 html.has-motion [data-reveal-item],
 html.has-motion [data-image-reveal],
-html.has-motion .hero__in { visibility: hidden; }
 .motion-word-mask { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; margin-bottom: -.08em; }
 .motion-word { display: inline-block; will-change: transform, opacity; }
 [data-image-reveal] { overflow: hidden; }
@@ -465,11 +475,6 @@ html.has-motion .hero__in { visibility: hidden; }
 @keyframes cell { 50% { background: var(--syrup); transform: scale(.82); } }
 html:not(.has-motion) .loader { display: none; }
 
-.hero__scroll { position: absolute; left: var(--gutter); bottom: 3rem; z-index: 2; display: flex; align-items: center; gap: .7rem; font-size: .78rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
-.hero__scroll span { width: 2px; height: 42px; background: rgba(42, 22, 11, .15); position: relative; overflow: hidden; border-radius: 2px; }
-.hero__scroll span::after { content: ""; position: absolute; inset: 0; background: var(--syrup); animation: drip 1.8s var(--ease) infinite; }
-@keyframes drip { 0% { transform: translateY(-100%); } 60%, 100% { transform: translateY(100%); } }
-@media (max-width: 860px) { .hero__scroll { display: none; } }
 
 .h2 em, .drinks__title em, .visit__title em, .offer__title em { color: var(--syrup); letter-spacing: -.02em; }
 .boxes .h2 em, .visit__title em { color: var(--gold); }
@@ -480,7 +485,7 @@ html:not(.has-motion) .loader { display: none; }
 .picker button:focus-visible { outline-offset: 2px; }
 .plate__stage::after { content: "From the shop"; position: absolute; right: 1.4rem; top: 1.4rem; font-size: .75rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
 .box__price strong, .dish p { font-variant-numeric: tabular-nums; }
-@media (prefers-reduced-motion: reduce) { .marquee__track, .loader__grid i, .hero__scroll span::after { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .marquee__track, .loader__grid i { animation: none; } }
 .mmenu[hidden] { display: none; }
 /* Keep all page content in its own layer so fixed overlays (menu, loader) always sit on top. */
 main { position: relative; z-index: 0; isolation: isolate; }
