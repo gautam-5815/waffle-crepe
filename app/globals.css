@@ -140,26 +140,25 @@ body:has(.page-home) .nav:not(.is-solid) .burger span { background: var(--cream)
   overflow: hidden;
   background: #0E0803;
 }
-.walk__canvas, .walk__video, .walk__backdrop {
+.walk__canvas, .walk__under {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   display: block;
 }
-.walk__canvas { object-fit: cover; }
-/* The stand-in clip is portrait. Shown whole and centred, with a blurred copy
-   of itself filling the rest of a wide screen rather than cropping it away. */
-.walk__video { object-fit: contain; z-index: 1; }
-.walk__backdrop {
-  object-fit: cover;
+.walk__canvas { z-index: 1; }
+/*
+ * On a tall screen the 16:9 frame is letterboxed rather than cropped to a
+ * vertical slice, and this blurred copy of the same frame fills the rest.
+ * The component adds .walk--boxed only when that happens; the canvas behind is
+ * a 64px-wide thumbnail, so the blur is cheap however big the screen is.
+ */
+.walk__under {
   z-index: 0;
-  filter: blur(34px) brightness(.55) saturate(1.1);
-  transform: scale(1.18);
+  opacity: 0;
+  filter: blur(30px) brightness(.5) saturate(1.15);
+  transform: scale(1.2);
 }
-/* Once the screen is as tall as it is wide, the clip fills it on its own. */
-@media (max-aspect-ratio: 1 / 1) {
-  .walk__video { object-fit: cover; }
-  .walk__backdrop { display: none; }
-}
+.walk--boxed .walk__under { opacity: 1; }
 
 /* The page's opening copy, directly under the walkthrough. */
 .intro {

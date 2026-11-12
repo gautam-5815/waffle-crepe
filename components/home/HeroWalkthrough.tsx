@@ -3,36 +3,37 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger, prefersReducedMotion } from "@/components/motion/motion";
 import { useLenis } from "@/components/motion/SmoothScroll";
+import { FRAME_COUNT, PACE } from "./walkPace";
 
 /**
  * Scroll-driven walk into the café: scrolling is the only thing that moves the
  * camera, forwards or back, and the hero unpins once the walk is over.
  *
- * Two sources are supported. The live one is the frame sequence in
- * public/frames (frame_0001.webp …); set USE_FRAMES to false to fall back to
- * scrubbing the MP4, which is only as precise as its keyframes.
+ * The frames live in public/frames and are played through PACE, which holds a
+ * frame index per step of equal visual change — see walkPace.ts.
  *
- * Those frames are built from the 100-frame export in public/Frame by picking
- * source frames at equal *visual* spacing rather than equal numbering: the
- * export spends 70 frames on a slow push-in and the last 30 on two cuts, so a
- * linear scrub would crawl and then lurch. Resampling evens out the pace.
+ * Smoothness comes from decoding every frame before the walk starts. A webp
+ * that has loaded but not decoded costs ~50ms the first time it is drawn,
+ * which is three dropped frames right when the user scrolls onto it.
  */
-const USE_FRAMES = true;
-const FRAME_COUNT = 52;
 const framePath = (i: number) => `/frames/frame_${String(i + 1).padStart(4, "0")}.webp`;
 
-const VIDEO_SRC = "/video/shop-tour.mp4";
-
 /** Scroll length of the walk. Shorter on a phone, so it is not a thumb marathon. */
-const scrollDistance = () => (window.matchMedia("(max-width: 860px)").matches ? "+=360%" : "+=500%");
+const scrollDistance = () => (window.matchMedia("(max-width: 860px)").matches ? "+=260%" : "+=420%");
 /** Retina is worth it; beyond 2x is just fill-rate for no visible gain. */
 const dpr = () => Math.min(window.devicePixelRatio || 1, 2);
+/**
+ * How far the 16:9 frame may be cropped to fill a tall viewport. Cover alone
+ * leaves a phone showing ~26% of the frame's width — a vertical slice with the
+ * storefront cropped out of it. Past this limit the frame is letterboxed over
+ * a blurred copy of itself instead.
+ */
+const MAX_CROP = 1.9;
 
 export default function HeroWalkthrough() {
   const root = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const backdropRef = useRef<HTMLVideoElement>(null);
+  const underRef = useRef<HTMLCanvasElement>(null);
   const lenis = useLenis();
   const [loader, setLoader] = useState<"show" | "hide" | "gone">("show");
 
@@ -41,49 +42,64 @@ export default function HeroWalkthrough() {
     const seen = sessionStorage.getItem("wnc-loaded");
     let cancelled = false;
 
-    // ---- Frame sequence on a canvas -------------------------------------
     const images: (HTMLImageElement | undefined)[] = new Array(FRAME_COUNT);
+    const ready: boolean[] = new Array(FRAME_COUNT).fill(false);
     let lastDrawn = -1;
     let wanted = 0;
     let raf = 0;
+    let boxed = false;
 
-    const drawCover = (img: HTMLImageElement) => {
-      const canvas = canvasRef.current;
-      const ctx2d = canvas?.getContext("2d");
-      if (!canvas || !ctx2d) return;
-      const { width: cw, height: ch } = canvas;
-      const scale = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
-      const w = img.naturalWidth * scale;
-      const h = img.naturalHeight * scale;
-      ctx2d.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
-    };
-
-    /** Nearest frame that has actually loaded, so the canvas never blanks. */
-    const nearestLoaded = (i: number) => {
-      if (images[i]?.complete) return i;
+    /** Nearest frame that has actually decoded, so the canvas never blanks. */
+    const nearestReady = (i: number) => {
+      if (ready[i]) return i;
       for (let step = 1; step < FRAME_COUNT; step++) {
-        if (images[i - step]?.complete) return i - step;
-        if (images[i + step]?.complete) return i + step;
+        if (ready[i - step]) return i - step;
+        if (ready[i + step]) return i + step;
       }
       return -1;
     };
 
-    /**
-     * 84 frames is dense enough that the nearest one is always close, so the
-     * playhead is simply rounded. No cross-fading: every pixel on screen comes
-     * from one exported frame.
-     */
+    const draw = (img: HTMLImageElement) => {
+      const canvas = canvasRef.current;
+      const ctx2d = canvas?.getContext("2d");
+      if (!canvas || !ctx2d) return;
+      const { width: cw, height: ch } = canvas;
+      const cover = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+      const fitWidth = cw / img.naturalWidth;
+      const scale = Math.min(cover, fitWidth * MAX_CROP);
+      const w = img.naturalWidth * scale;
+      const h = img.naturalHeight * scale;
+
+      const nowBoxed = h < ch - 1;
+      if (nowBoxed !== boxed) {
+        boxed = nowBoxed;
+        root.current?.classList.toggle("walk--boxed", boxed);
+      }
+      if (boxed) {
+        // Blurred fill behind the band. CSS does the blurring, so this canvas
+        // is deliberately tiny — a few thousand pixels to scale up and smear.
+        const under = underRef.current;
+        const uctx = under?.getContext("2d");
+        if (under && uctx) {
+          const us = Math.max(under.width / img.naturalWidth, under.height / img.naturalHeight);
+          const uw = img.naturalWidth * us;
+          const uh = img.naturalHeight * us;
+          uctx.drawImage(img, (under.width - uw) / 2, (under.height - uh) / 2, uw, uh);
+        }
+        ctx2d.clearRect(0, 0, cw, ch);
+      }
+      ctx2d.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+    };
+
     const paint = () => {
       raf = 0;
-      const want = Math.round(wanted);
-      if (want === lastDrawn) return;
-      const ctx2d = canvasRef.current?.getContext("2d");
-      if (!ctx2d) return;
-      const a = nearestLoaded(want);
+      const step = Math.min(Math.max(Math.round(wanted), 0), PACE.length - 1);
+      const frame = PACE[step];
+      if (frame === lastDrawn) return;
+      const a = nearestReady(frame);
       if (a < 0) return;
-      ctx2d.imageSmoothingQuality = "high";
-      drawCover(images[a]!);
-      lastDrawn = want;
+      draw(images[a]!);
+      lastDrawn = frame;
     };
     const schedulePaint = () => { if (!raf) raf = requestAnimationFrame(paint); };
 
@@ -93,96 +109,72 @@ export default function HeroWalkthrough() {
       const r = canvas.getBoundingClientRect();
       canvas.width = Math.round(r.width * dpr());
       canvas.height = Math.round(r.height * dpr());
+      const ctx2d = canvas.getContext("2d");
+      if (ctx2d) ctx2d.imageSmoothingQuality = "high"; // resets whenever width/height is set
+      const under = underRef.current;
+      if (under) { under.width = 64; under.height = Math.max(16, Math.round(64 * r.height / r.width)); }
       lastDrawn = -1; // force a repaint at the new size
       schedulePaint();
     };
 
-    const loadFrame = (i: number) =>
-      new Promise<void>((resolve) => {
-        if (images[i]) return resolve();
-        const img = new Image();
-        img.decoding = "async";
-        img.onload = () => { if (i === wanted) schedulePaint(); resolve(); };
-        img.onerror = () => resolve();
-        img.src = framePath(i);
-        images[i] = img;
-      });
+    /** Load *and decode*: decode() is what keeps the scrub from hitching. */
+    const loadFrame = async (i: number) => {
+      if (images[i]) return;
+      const img = new Image();
+      images[i] = img;
+      img.decoding = "async";
+      img.src = framePath(i);
+      try {
+        await img.decode();
+        ready[i] = true;
+        if (!cancelled && PACE[Math.round(wanted)] === i) schedulePaint();
+      } catch {
+        // A frame that fails to decode stays unready; nearestReady covers it.
+      }
+    };
 
     const preloadAll = async () => {
       await loadFrame(0);
       if (cancelled) return;
       resize();
-      // Fill in the rest a few at a time so the first paint is not starved.
-      for (let i = 1; i < FRAME_COUNT && !cancelled; i += 4) {
+      for (let i = 1; i < FRAME_COUNT && !cancelled; i += 6) {
         const batch = [];
-        for (let j = i; j < Math.min(i + 4, FRAME_COUNT); j++) batch.push(loadFrame(j));
+        for (let j = i; j < Math.min(i + 6, FRAME_COUNT); j++) batch.push(loadFrame(j));
         await Promise.all(batch);
       }
     };
 
-    // ---- Video scrubbing -------------------------------------------------
-    let seeking = false;
-    let pending = -1;
-    const seekTo = (time: number) => {
-      const v = videoRef.current;
-      if (!v || !Number.isFinite(v.duration) || v.duration === 0) return;
-      const t = Math.min(Math.max(time, 0), v.duration - 0.01);
-      // The backdrop is blurred past recognition, so it can seek unqueued.
-      const bg = backdropRef.current;
-      if (bg?.duration) bg.currentTime = t;
-      if (seeking) { pending = t; return; }        // never stack seek requests
-      if (Math.abs(v.currentTime - t) < 0.01) return;
-      seeking = true;
-      v.currentTime = t;
+    const render = (step: number) => {
+      wanted = Math.min(Math.max(step, 0), PACE.length - 1);
+      schedulePaint();
     };
-    const onSeeked = () => {
-      seeking = false;
-      if (pending >= 0) { const t = pending; pending = -1; seekTo(t); }
-    };
-
-    // `frame` arrives fractional from the scrub; paint() rounds to a real frame.
-    const render = (frame: number) => {
-      if (USE_FRAMES) { wanted = Math.min(Math.max(frame, 0), FRAME_COUNT - 1); schedulePaint(); }
-      else {
-        const v = videoRef.current;
-        if (v?.duration) seekTo((frame / (FRAME_COUNT - 1)) * v.duration);
-      }
-    };
-
-    const video = videoRef.current;
-    video?.addEventListener("seeked", onSeeked);
-    video?.pause();
-    backdropRef.current?.pause();
 
     // Pinning re-wraps the section, which can change the canvas box without a
     // window resize — watch the element itself rather than the window.
-    let ro: ResizeObserver | undefined;
-    if (USE_FRAMES) {
-      resize();
-      preloadAll();
-      ro = new ResizeObserver(resize);
-      if (canvasRef.current) ro.observe(canvasRef.current);
-    }
+    resize();
+    preloadAll();
+    const ro = new ResizeObserver(resize);
+    if (canvasRef.current) ro.observe(canvasRef.current);
 
     // ---- The scroll rig --------------------------------------------------
     const ctx = gsap.context(() => {
       const start = () => {
         if (reduce) { render(0); return; }
-        const playhead = { frame: 0 };
+        const playhead = { step: 0 };
         gsap.to(playhead, {
-          frame: FRAME_COUNT - 1,
+          step: PACE.length - 1,
           ease: "none",
           scrollTrigger: {
             trigger: root.current,
             start: "top top",
             end: scrollDistance,
-            scrub: 1.5,
+            scrub: 1,
             pin: true,
             anticipatePin: 1,
             invalidateOnRefresh: true,
             onRefresh: resize,
           },
-          onUpdate: () => render(playhead.frame),
+          onUpdate: () => render(playhead.step),
         });
         ScrollTrigger.refresh();
       };
@@ -201,8 +193,7 @@ export default function HeroWalkthrough() {
     return () => {
       cancelled = true;
       if (raf) cancelAnimationFrame(raf);
-      ro?.disconnect();
-      video?.removeEventListener("seeked", onSeeked);
+      ro.disconnect();
       ctx.revert();
     };
   }, [lenis]);
@@ -215,16 +206,9 @@ export default function HeroWalkthrough() {
           <p>Warming the iron…</p>
         </div>
       )}
-      {USE_FRAMES ? (
-        <canvas className="walk__canvas" ref={canvasRef} aria-hidden="true" />
-      ) : (
-        <>
-          {/* The clip is portrait; a blurred copy fills the width so the whole
-              frame can be shown on a wide screen instead of cropped to a slice. */}
-          <video className="walk__backdrop" ref={backdropRef} src={VIDEO_SRC} muted playsInline preload="auto" aria-hidden="true" />
-          <video className="walk__video" ref={videoRef} src={VIDEO_SRC} muted playsInline preload="auto" aria-hidden="true" />
-        </>
-      )}
+      {/* Only shown when the frame is letterboxed — see MAX_CROP. */}
+      <canvas className="walk__under" ref={underRef} aria-hidden="true" />
+      <canvas className="walk__canvas" ref={canvasRef} aria-hidden="true" />
     </section>
   );
 }

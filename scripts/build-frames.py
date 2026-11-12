@@ -1,0 +1,152 @@
+"""Build the hero walkthrough frames from the source export.
+
+    python scripts/build-frames.py
+
+Reads public/Frame (the raw export, gitignored) and writes:
+  - public/frames/frame_0001.webp ...  the frames actually used, re-encoded
+  - components/home/walkPace.ts        the playhead -> frame table
+
+Why a table instead of playing the export straight through: the export is
+unevenly paced. It spends ~70 frames on a slow push-in on the storefront and
+the last ~30 on two hard cuts into the interior, so a linear scrub crawls and
+then lurches. Here each playhead step is an equal amount of *visual* change,
+measured as the mean per-pixel difference between consecutive frames.
+
+Frames the table never lands on are not written at all, which is where most of
+the weight saving comes from -- the steps bunch up around the cuts.
+"""
+
+import glob
+import os
+import shutil
+import statistics
+
+from PIL import Image, ImageChops, ImageFilter
+
+SRC_DIR = "public/Frame"
+OUT_DIR = "public/frames"
+TABLE = "components/home/walkPace.ts"
+
+# Playhead resolution. More steps means a finer scrub but no extra bytes --
+# steps share frames. Beyond the source frame count it only adds repeats.
+STEPS = 100
+# Encoded size of each frame. The hero is in motion and is letterboxed on
+# phones, so this is comfortably past what reads as sharp.
+SIZE = (1366, 768)
+QUALITY = 73
+
+
+# A cross-dissolve shows both shots at once, which lowers local contrast. A
+# frame below this share of its OWN shot's crispest frame is a blend rather
+# than a settled shot.
+SHARP_FLOOR = 0.95
+# Frame-to-frame change that means a hard cut rather than camera movement. The
+# export's two cuts measure ~31 and ~35; its largest real movement is ~13.
+CUT_JUMP = 20.0
+
+
+def edge_energy(path):
+    """Local contrast. Drops while a cross-dissolve is showing two shots."""
+    edges = Image.open(path).convert("L").resize((640, 360)).filter(ImageFilter.FIND_EDGES)
+    return statistics.pstdev(list(edges.getdata()))
+
+
+def drop_unresolved_tail(paths, steps):
+    """Trim trailing frames that are still mid-dissolve.
+
+    The walk has to end on a real shot; ending on a blend looks like a
+    rendering bug. Only the final shot is examined, because sharpness is not
+    comparable across a cut -- the export's exterior frames are far crisper
+    than any interior one, so measuring against the whole sequence would
+    condemn every interior frame. A clean export loses nothing here.
+    """
+    last_cut = 0
+    for i, step in enumerate(steps):
+        if step > CUT_JUMP:
+            last_cut = i + 1
+    energies = [edge_energy(p) for p in paths[last_cut:]]
+    if not energies:
+        return paths, 0
+    reference = max(energies)
+    cut = len(energies)
+    while cut > 1 and energies[cut - 1] < reference * SHARP_FLOOR:
+        cut -= 1
+    keep = last_cut + cut
+    return paths[:keep], len(paths) - keep
+
+
+def frame_steps(paths):
+    """Visual change from each frame to the next, one entry per gap."""
+    steps = []
+    previous = None
+    for path in paths:
+        small = Image.open(path).convert("L").resize((160, 90))
+        if previous is not None:
+            steps.append(sum(ImageChops.difference(small, previous).getdata()) / (160 * 90))
+        previous = small
+    return steps
+
+
+def motion_curve(steps):
+    """Cumulative visual change, one entry per frame."""
+    cumulative = [0.0]
+    for step in steps:
+        cumulative.append(cumulative[-1] + step)
+    return cumulative
+
+
+def main():
+    sources = sorted(glob.glob(os.path.join(SRC_DIR, "*.webp")))
+    if not sources:
+        raise SystemExit(f"No frames in {SRC_DIR}/ -- is the export unpacked?")
+
+    sources, dropped = drop_unresolved_tail(sources, frame_steps(sources))
+    if dropped:
+        print(f"dropped {dropped} trailing frame(s): still mid-dissolve, so the walk "
+              f"now ends on frame {len(sources)}")
+
+    cumulative = motion_curve(frame_steps(sources))
+    total = cumulative[-1]
+    if total <= 0:
+        raise SystemExit("Every frame is identical; nothing to pace.")
+
+    picks = [
+        min(range(len(cumulative)), key=lambda i: abs(cumulative[i] - total * k / (STEPS - 1)))
+        for k in range(STEPS)
+    ]
+    used = sorted(set(picks))
+    renumbered = {source: index for index, source in enumerate(used)}
+    pace = [renumbered[p] for p in picks]
+
+    if os.path.exists(OUT_DIR):
+        shutil.rmtree(OUT_DIR)
+    os.makedirs(OUT_DIR)
+
+    written = 0
+    for index, source in enumerate(used, start=1):
+        out = os.path.join(OUT_DIR, "frame_%04d.webp" % index)
+        Image.open(sources[source]).convert("RGB").resize(SIZE, Image.LANCZOS).save(
+            out, "WEBP", quality=QUALITY, method=6
+        )
+        written += os.path.getsize(out)
+
+    # Always UTF-8 and LF: Python would otherwise use the Windows code page,
+    # which writes a byte Turbopack refuses to parse.
+    with open(TABLE, "w", encoding="utf-8", newline="\n") as handle:
+        handle.write(
+            "// GENERATED by scripts/build-frames.py -- do not edit by hand.\n"
+            "//\n"
+            "// Maps the scroll playhead to a frame file. Each step is an equal amount\n"
+            "// of visual change, which is what makes the scrub feel evenly paced.\n"
+            "// Repeats are deliberate: they hold on a frame across a hard cut.\n"
+            "export const FRAME_COUNT = %d;\n"
+            "export const PACE: readonly number[] = [%s];\n"
+            % (len(used), ", ".join(str(v) for v in pace))
+        )
+
+    print(f"{len(sources)} source frames -> {len(used)} written, {STEPS} playhead steps")
+    print(f"{written / 1048576:.2f} MB in {OUT_DIR}/, table in {TABLE}")
+
+
+if __name__ == "__main__":
+    main()
